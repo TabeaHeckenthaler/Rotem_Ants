@@ -1,25 +1,28 @@
 from itertools import combinations
 import time  # to wait a while in the solver
-
+from copy import deepcopy
 import networkx as nx
 import numpy as np
 
 
-class Human_Solver:
-    def __init__(self, graph, actual_edges, similar_edges):
-        self._graph = graph  # the perceived connection+cost graph (cost = 'weight')
+class HumanSolver:
+    def __init__(self, graph, actual_edges, similar_edges, rand_gen):
+        self._graph = deepcopy(graph)  # the perceived connection+cost graph (cost = 'weight')
         self._actual_edges = actual_edges  # actual edges for attempts
         self._similar_edges = similar_edges
         self._current_state = 'c'  # not 'a'
+        self._gen = rand_gen
+        self._attempts = []
 
     def solve_maze(self):
         statelis = [self._current_state]
         while self._current_state != 'j':
-            print(f"\nI'm at {self._current_state}")
+            # print(f"\nI'm at {self._current_state}")
             self.one_step()
             statelis.append(self._current_state)
             # time.sleep(3)
-        print("\nDone! States visited:", "->".join(statelis))
+        # print("\nDone! States visited:", "->".join(statelis))
+        print(",".join(self._attempts))
 
     def one_step(self):
         if self._current_state == 'j': raise Exception("Already at Target!")
@@ -28,7 +31,7 @@ class Human_Solver:
                                  source=self._current_state,
                                  target='j',
                                  weight='weight'
-                                 #method?
+                                 # method?
                                  )[:2]  # returns list of nodes - not edges
         if self.attempt(to_do):
             self.decrease_cost(to_do)
@@ -41,32 +44,32 @@ class Human_Solver:
         :param edge:
         :return: whether traversing edge is successful
         """
+        self._attempts.append("-".join(edge))
         # TODO: add randomness?
         r = sorted(edge) in self._actual_edges
-        print("attempted to move from {} to {}.".format(*edge), "Succeeded!" if r else "Failed!")
+        # print("attempted to move from {} to {}.".format(*edge), "Succeeded!" if r else "Failed!")
         return r
 
     def decrease_cost(self, edge):
         # TODO: how to decrease the cost
         edge = "".join(sorted(edge))
 
-        self._graph[edge[0]][edge[1]]['weight'] /= 2
-        print("Decreased weight of edge {} to {}".format(edge, self._graph[edge[0]][edge[1]]['weight']))
+        self._graph[edge[0]][edge[1]]['weight'] /= 2**self._gen.normal(1, 2)
+        # print("Decreased weight of edge {} to {}".format(edge, self._graph[edge[0]][edge[1]]['weight']))
         for sim in self._similar_edges.get(edge, []):
-            self._graph[sim[0]][sim[1]]['weight'] /= 1.5
-            print("Decreased weight of edge {} to {}".format(sim, self._graph[sim[0]][sim[1]]['weight']))
-
+            self._graph[sim[0]][sim[1]]['weight'] /= 1.5**self._gen.normal(1, 2)
+            # print("Decreased weight of edge {} to {}".format(sim, self._graph[sim[0]][sim[1]]['weight']))
 
     def increase_cost(self, edge):
         # TODO: how to increase the cost
         # TODO: also increase/decrease similarity measure if it was correct/false?
         edge = "".join(sorted(edge))
 
-        self._graph[edge[0]][edge[1]]['weight'] *= 2
-        print("Increased weight of edge {} to {}".format(edge, self._graph[edge[0]][edge[1]]['weight']))
+        self._graph[edge[0]][edge[1]]['weight'] *= 2**self._gen.normal(1, 2)
+        # print("Increased weight of edge {} to {}".format(edge, self._graph[edge[0]][edge[1]]['weight']))
         for sim in self._similar_edges.get(edge, []):
-            self._graph[sim[0]][sim[1]]['weight'] *= 1.5
-            print("Increased weight of edge {} to {}".format(sim, self._graph[sim[0]][sim[1]]['weight']))
+            self._graph[sim[0]][sim[1]]['weight'] *= 1.5**self._gen.normal(1, 2)
+            # print("Increased weight of edge {} to {}".format(sim, self._graph[sim[0]][sim[1]]['weight']))
 
 
 # refactor to have the graph construction in a function
@@ -109,5 +112,7 @@ if __name__ == '__main__':
     # print(nx.shortest_path(perceived_graph, source='c', target='j', weight='weight'))
     # print(nx.shortest_path(perceived_graph, source='a', target='j', weight='weight'))
 
-    solver = Human_Solver(perceived_graph, edge_lis, similar_edges)
-    solver.solve_maze()
+    rand_gen = np.random.default_rng(43)
+    for _ in range(500):
+        solver = HumanSolver(perceived_graph, edge_lis, similar_edges, rand_gen)
+        solver.solve_maze()
